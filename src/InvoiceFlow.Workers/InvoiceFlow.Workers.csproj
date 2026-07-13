@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-InvoiceFlow.Workers-0ddc82b9-11f2-40aa-93fd-d47de6401f43</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="MassTransit" />
+    <PackageReference Include="MassTransit.RabbitMQ" />
+    <PackageReference Include="Quartz.Extensions.Hosting" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\InvoiceFlow.Core\InvoiceFlow.Core.csproj" />
+    <ProjectReference Include="..\InvoiceFlow.Application\InvoiceFlow.Application.csproj" />
+    <ProjectReference Include="..\InvoiceFlow.Infrastructure\InvoiceFlow.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

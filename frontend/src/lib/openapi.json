@@ -1,0 +1,1173 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "InvoiceFlow API",
+    "description": "E-invoice processing platform with AI extraction and global compliance (PEPPOL, ZATCA, Brazil NFe, India IRP, Mexico CFDI, CTC reporting, and post-audit archival).",
+    "version": "0.2.0"
+  },
+  "servers": [
+    { "url": "http://localhost:8000", "description": "Local development" },
+    { "url": "/api/v1", "description": "Production (Nginx proxy)" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT token obtained from POST /api/v1/auth/login"
+      }
+    },
+    "schemas": {
+      "InvoiceStatus": {
+        "type": "string",
+        "enum": ["received", "processing", "extracted", "reviewing", "approved", "compliant", "transmitted", "failed", "rejected"]
+      },
+      "ComplianceModel": {
+        "type": "string",
+        "enum": ["peppol", "clearance", "ctc", "post_audit"]
+      },
+      "ExtractionMethod": {
+        "type": "string",
+        "enum": ["ocr", "llm", "xml", "manual"]
+      },
+      "IngestionSource": {
+        "type": "string",
+        "enum": ["email", "ftp", "sftp", "api", "webhook", "manual"]
+      },
+
+      "InvoiceLine": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "invoice_id": { "type": "string", "format": "uuid" },
+          "line_number": { "type": "integer" },
+          "description": { "type": "string", "nullable": true },
+          "quantity": { "type": "number" },
+          "unit_price": { "type": "number" },
+          "tax_rate": { "type": "number" },
+          "tax_amount": { "type": "number" },
+          "line_total": { "type": "number" },
+          "item_code": { "type": "string", "nullable": true }
+        },
+        "required": ["id", "invoice_id", "line_number", "quantity", "unit_price", "tax_rate", "tax_amount", "line_total"]
+      },
+      "InvoiceLineCreate": {
+        "type": "object",
+        "properties": {
+          "line_number": { "type": "integer" },
+          "description": { "type": "string", "nullable": true },
+          "quantity": { "type": "number", "default": 1.0 },
+          "unit_price": { "type": "number", "default": 0.0 },
+          "tax_rate": { "type": "number", "default": 0.0 },
+          "item_code": { "type": "string", "nullable": true }
+        },
+        "required": ["line_number"]
+      },
+
+      "Invoice": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "tenant_id": { "type": "string", "format": "uuid" },
+          "status": { "$ref": "#/components/schemas/InvoiceStatus" },
+          "invoice_number": { "type": "string" },
+          "vendor_name": { "type": "string" },
+          "vendor_tax_id": { "type": "string", "nullable": true },
+          "buyer_name": { "type": "string", "nullable": true },
+          "buyer_tax_id": { "type": "string", "nullable": true },
+          "invoice_date": { "type": "string", "format": "date-time", "nullable": true },
+          "due_date": { "type": "string", "format": "date-time", "nullable": true },
+          "currency": { "type": "string" },
+          "subtotal": { "type": "number" },
+          "tax_amount": { "type": "number" },
+          "total_amount": { "type": "number" },
+          "country_code": { "type": "string" },
+          "compliance_model": { "$ref": "#/components/schemas/ComplianceModel" },
+          "source": { "$ref": "#/components/schemas/IngestionSource" },
+          "source_reference": { "type": "string", "nullable": true },
+          "file_url": { "type": "string", "nullable": true },
+          "original_filename": { "type": "string", "nullable": true },
+          "ocr_confidence": { "type": "number", "nullable": true },
+          "extraction_method": { "$ref": "#/components/schemas/ExtractionMethod" },
+          "extracted_data": { "type": "object", "additionalProperties": true },
+          "compliance_response": { "type": "object", "additionalProperties": true },
+          "error_message": { "type": "string", "nullable": true },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" },
+          "lines": { "type": "array", "items": { "$ref": "#/components/schemas/InvoiceLine" } },
+          "audit_log": { "type": "array", "items": { "$ref": "#/components/schemas/AuditLog" }, "description": "Audit trail entries (included in detail view)" }
+        },
+        "required": ["id", "tenant_id", "status", "invoice_number", "vendor_name", "currency", "subtotal", "tax_amount", "total_amount", "country_code", "compliance_model", "source", "created_at", "updated_at"]
+      },
+      "InvoiceCreate": {
+        "type": "object",
+        "properties": {
+          "invoice_number": { "type": "string", "maxLength": 100 },
+          "vendor_name": { "type": "string", "maxLength": 255 },
+          "vendor_tax_id": { "type": "string", "nullable": true },
+          "buyer_name": { "type": "string", "nullable": true },
+          "buyer_tax_id": { "type": "string", "nullable": true },
+          "invoice_date": { "type": "string", "format": "date-time", "nullable": true },
+          "due_date": { "type": "string", "format": "date-time", "nullable": true },
+          "currency": { "type": "string", "default": "USD" },
+          "country_code": { "type": "string", "maxLength": 2 },
+          "compliance_model": { "$ref": "#/components/schemas/ComplianceModel" },
+          "lines": { "type": "array", "items": { "$ref": "#/components/schemas/InvoiceLineCreate" }, "default": [] }
+        },
+        "required": ["invoice_number", "vendor_name", "country_code", "compliance_model"]
+      },
+      "InvoiceUpdate": {
+        "type": "object",
+        "properties": {
+          "invoice_number": { "type": "string", "nullable": true },
+          "vendor_name": { "type": "string", "nullable": true },
+          "vendor_tax_id": { "type": "string", "nullable": true },
+          "buyer_name": { "type": "string", "nullable": true },
+          "buyer_tax_id": { "type": "string", "nullable": true },
+          "invoice_date": { "type": "string", "format": "date-time", "nullable": true },
+          "due_date": { "type": "string", "format": "date-time", "nullable": true },
+          "currency": { "type": "string", "nullable": true },
+          "status": { "$ref": "#/components/schemas/InvoiceStatus" }
+        }
+      },
+      "InvoiceListResponse": {
+        "type": "object",
+        "properties": {
+          "invoices": { "type": "array", "items": { "$ref": "#/components/schemas/Invoice" } },
+          "total": { "type": "integer" },
+          "page": { "type": "integer" },
+          "page_size": { "type": "integer" }
+        },
+        "required": ["invoices", "total", "page", "page_size"]
+      },
+
+      "AuditLog": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "tenant_id": { "type": "string", "format": "uuid" },
+          "invoice_id": { "type": "string", "format": "uuid", "nullable": true },
+          "action": { "type": "string" },
+          "details": { "type": "object", "additionalProperties": true },
+          "user_id": { "type": "string", "nullable": true },
+          "timestamp": { "type": "string", "format": "date-time" }
+        },
+        "required": ["id", "tenant_id", "action", "timestamp"]
+      },
+
+      "TokenRequest": {
+        "type": "object",
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string" }
+        },
+        "required": ["email", "password"]
+      },
+      "TokenResponse": {
+        "type": "object",
+        "properties": {
+          "access_token": { "type": "string" },
+          "token_type": { "type": "string", "default": "bearer" },
+          "user_id": { "type": "string" },
+          "tenant_id": { "type": "string" }
+        },
+        "required": ["access_token", "user_id", "tenant_id"]
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string" },
+          "full_name": { "type": "string", "nullable": true },
+          "tenant_name": { "type": "string" },
+          "tenant_slug": { "type": "string" },
+          "country_code": { "type": "string", "default": "US" }
+        },
+        "required": ["email", "password", "tenant_name", "tenant_slug"]
+      },
+      "UserResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "email": { "type": "string" },
+          "full_name": { "type": "string", "nullable": true },
+          "role": { "type": "string" },
+          "tenant_id": { "type": "string", "format": "uuid" }
+        },
+        "required": ["id", "email", "role", "tenant_id"]
+      },
+
+      "FileUploadResponse": {
+        "type": "object",
+        "properties": {
+          "invoice_id": { "type": "string", "format": "uuid", "nullable": true, "description": "Null when processing is async; use task_id for tracking" },
+          "status": { "$ref": "#/components/schemas/InvoiceStatus" },
+          "filename": { "type": "string" },
+          "message": { "type": "string" }
+        },
+        "required": ["status", "filename", "message"]
+      },
+      "PollResponse": {
+        "type": "object",
+        "properties": {
+          "task_id": { "type": "string" },
+          "source_type": { "$ref": "#/components/schemas/IngestionSource" },
+          "status": { "type": "string" },
+          "message": { "type": "string" }
+        },
+        "required": ["task_id", "source_type", "status", "message"]
+      },
+      "IngestionStatsResponse": {
+        "type": "object",
+        "properties": {
+          "total_ingested": { "type": "integer" },
+          "by_source": { "type": "object", "additionalProperties": { "type": "integer" } },
+          "last_poll_at": { "type": "string", "format": "date-time", "nullable": true },
+          "pending_processing": { "type": "integer" }
+        },
+        "required": ["total_ingested", "by_source", "pending_processing"]
+      },
+      "WebhookPayload": {
+        "type": "object",
+        "properties": {
+          "filename": { "type": "string" },
+          "file_content_b64": { "type": "string", "description": "Base64-encoded file content" },
+          "mime_type": { "type": "string", "default": "application/pdf" },
+          "source_reference": { "type": "string" },
+          "metadata": { "type": "object", "additionalProperties": true }
+        },
+        "required": ["filename", "file_content_b64"]
+      },
+      "TaskStatusResponse": {
+        "type": "object",
+        "properties": {
+          "task_id": { "type": "string" },
+          "status": { "type": "string" },
+          "result": { "type": "string", "nullable": true },
+          "traceback": { "type": "string", "nullable": true }
+        },
+        "required": ["task_id", "status"]
+      },
+
+      "DashboardStats": {
+        "type": "object",
+        "properties": {
+          "invoices_today": { "type": "integer" },
+          "success_rate": { "type": "number" },
+          "pending": { "type": "integer" },
+          "total_processed": { "type": "integer" }
+        },
+        "required": ["invoices_today", "success_rate", "pending", "total_processed"]
+      },
+      "ChartData": {
+        "type": "object",
+        "properties": {
+          "labels": { "type": "array", "items": { "type": "string" } },
+          "data": { "type": "array", "items": { "type": "integer" } }
+        },
+        "required": ["labels", "data"]
+      },
+
+      "ComplianceStatusResponse": {
+        "type": "object",
+        "properties": {
+          "pending": { "type": "integer" },
+          "compliant": { "type": "integer" },
+          "failed": { "type": "integer" }
+        },
+        "required": ["pending", "compliant", "failed"]
+      },
+      "ComplianceValidationResponse": {
+        "type": "object",
+        "properties": {
+          "valid": { "type": "boolean" },
+          "errors": { "type": "array", "items": { "type": "string" } },
+          "warnings": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["valid", "errors", "warnings"]
+      },
+      "ComplianceConfigCreate": {
+        "type": "object",
+        "properties": {
+          "country_code": { "type": "string" },
+          "model": { "type": "string", "enum": ["peppol", "clearance", "ctc", "post_audit"] },
+          "enabled": { "type": "boolean", "default": true },
+          "config": { "type": "object", "additionalProperties": true }
+        },
+        "required": ["country_code", "model"]
+      },
+      "ComplianceConfigResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "tenant_id": { "type": "string", "format": "uuid" },
+          "country_code": { "type": "string" },
+          "model": { "type": "string" },
+          "enabled": { "type": "boolean" },
+          "config": { "type": "object", "additionalProperties": true },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        },
+        "required": ["id", "tenant_id", "country_code", "model", "enabled", "config", "created_at", "updated_at"]
+      },
+
+      "ExtractionStatusResponse": {
+        "type": "object",
+        "properties": {
+          "invoice_id": { "type": "string" },
+          "status": { "$ref": "#/components/schemas/InvoiceStatus" },
+          "extraction_method": { "$ref": "#/components/schemas/ExtractionMethod" },
+          "ocr_confidence": { "type": "number", "nullable": true },
+          "error_message": { "type": "string", "nullable": true },
+          "processing_started_at": { "type": "string", "format": "date-time", "nullable": true },
+          "processing_completed_at": { "type": "string", "format": "date-time", "nullable": true }
+        },
+        "required": ["invoice_id", "status"]
+      },
+
+      "TenantSettings": {
+        "type": "object",
+        "properties": {
+          "settings": {
+            "type": "object",
+            "properties": {
+              "tenant_name": { "type": "string" },
+              "country_code": { "type": "string" },
+              "default_currency": { "type": "string" },
+              "default_compliance_model": { "type": "string" },
+              "tax_id": { "type": "string", "nullable": true },
+              "registration_number": { "type": "string", "nullable": true },
+              "custom_settings": { "type": "object", "additionalProperties": true }
+            }
+          }
+        },
+        "required": ["settings"]
+      },
+      "CountryConfig": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "model": { "type": "string" },
+          "system": { "type": "string" }
+        },
+        "required": ["code", "name", "model", "system"]
+      },
+      "CountryConfigList": {
+        "type": "object",
+        "properties": {
+          "countries": { "type": "array", "items": { "$ref": "#/components/schemas/CountryConfig" } }
+        },
+        "required": ["countries"]
+      },
+
+      "AvailableConnector": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string" },
+          "display_name": { "type": "string" },
+          "directions": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["type", "display_name", "directions"]
+      },
+      "ConnectorCreate": {
+        "type": "object",
+        "properties": {
+          "connector_type": { "type": "string", "enum": ["sap", "oracle", "xero"] },
+          "display_name": { "type": "string" },
+          "api_key": { "type": "string", "nullable": true },
+          "api_secret": { "type": "string", "nullable": true },
+          "base_url": { "type": "string", "nullable": true },
+          "sandbox": { "type": "boolean", "default": true },
+          "sync_direction": { "type": "string", "enum": ["push", "pull", "bidirectional"] },
+          "extra_config": { "type": "object", "additionalProperties": true }
+        },
+        "required": ["connector_type", "display_name"]
+      },
+      "ConnectorResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "tenant_id": { "type": "string", "format": "uuid" },
+          "connector_type": { "type": "string" },
+          "display_name": { "type": "string" },
+          "status": { "type": "string", "enum": ["active", "inactive", "error", "pending_auth"] },
+          "sandbox": { "type": "boolean" },
+          "sync_direction": { "type": "string" },
+          "last_sync_at": { "type": "string", "format": "date-time", "nullable": true },
+          "total_synced": { "type": "integer" },
+          "total_failed": { "type": "integer" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        },
+        "required": ["id", "tenant_id", "connector_type", "display_name", "status", "sandbox", "sync_direction", "created_at", "updated_at"]
+      },
+      "ConnectorSyncRequest": {
+        "type": "object",
+        "properties": {
+          "direction": { "type": "string", "enum": ["push", "pull"] },
+          "invoice_id": { "type": "string", "format": "uuid", "nullable": true },
+          "invoice_ids": { "type": "array", "items": { "type": "string", "format": "uuid" }, "nullable": true },
+          "since": { "type": "string", "format": "date-time", "nullable": true },
+          "limit": { "type": "integer", "default": 100 }
+        },
+        "required": ["direction"]
+      },
+      "ConnectorSyncResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "connector_type": { "type": "string" },
+          "direction": { "type": "string" },
+          "records_synced": { "type": "integer" },
+          "records_failed": { "type": "integer" },
+          "erp_ids": { "type": "array", "items": { "type": "string" } },
+          "errors": { "type": "array", "items": { "type": "string" } },
+          "warnings": { "type": "array", "items": { "type": "string" } },
+          "raw_response": { "type": "object", "nullable": true, "additionalProperties": true }
+        },
+        "required": ["success", "connector_type", "direction", "records_synced", "records_failed", "erp_ids", "errors", "warnings"]
+      },
+      "ConnectorTestResponse": {
+        "type": "object",
+        "properties": {
+          "connector": { "type": "string" },
+          "status": { "type": "string" },
+          "sandbox": { "type": "boolean" },
+          "message": { "type": "string" },
+          "auth_url": { "type": "string", "nullable": true }
+        },
+        "required": ["connector", "status", "message"]
+      },
+
+      "WebhookCreate": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "url": { "type": "string", "format": "uri" },
+          "secret": { "type": "string", "nullable": true },
+          "events": { "type": "array", "items": { "type": "string" } },
+          "content_type": { "type": "string", "default": "application/json" },
+          "timeout_seconds": { "type": "integer", "default": 30 },
+          "max_retries": { "type": "integer", "default": 3 },
+          "active": { "type": "boolean", "default": true }
+        },
+        "required": ["name", "url", "events"]
+      },
+      "WebhookUpdate": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "nullable": true },
+          "url": { "type": "string", "format": "uri", "nullable": true },
+          "secret": { "type": "string", "nullable": true },
+          "events": { "type": "array", "items": { "type": "string" }, "nullable": true },
+          "content_type": { "type": "string", "nullable": true },
+          "timeout_seconds": { "type": "integer", "nullable": true },
+          "max_retries": { "type": "integer", "nullable": true },
+          "active": { "type": "boolean", "nullable": true }
+        }
+      },
+      "WebhookResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "tenant_id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "url": { "type": "string" },
+          "active": { "type": "boolean" },
+          "events": { "type": "array", "items": { "type": "string" } },
+          "content_type": { "type": "string" },
+          "timeout_seconds": { "type": "integer" },
+          "max_retries": { "type": "integer" },
+          "last_triggered_at": { "type": "string", "format": "date-time", "nullable": true },
+          "last_status_code": { "type": "integer", "nullable": true },
+          "success_count": { "type": "integer" },
+          "failure_count": { "type": "integer" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        },
+        "required": ["id", "tenant_id", "name", "url", "active", "events", "content_type", "timeout_seconds", "max_retries", "success_count", "failure_count", "created_at", "updated_at"]
+      },
+      "WebhookTestResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "status_code": { "type": "integer", "nullable": true },
+          "message": { "type": "string" },
+          "response_time_ms": { "type": "number" }
+        },
+        "required": ["success", "message", "response_time_ms"]
+      },
+      "WebhookEventList": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+
+      "MessageResponse": {
+        "type": "object",
+        "properties": {
+          "message": { "type": "string" }
+        },
+        "required": ["message"]
+      },
+      "ActivationResponse": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["active", "inactive"] }
+        },
+        "required": ["status"]
+      },
+      "ToggleResponse": {
+        "type": "object",
+        "properties": {
+          "active": { "type": "boolean" }
+        },
+        "required": ["active"]
+      },
+      "ComplianceTaskResponse": {
+        "type": "object",
+        "properties": {
+          "task_id": { "type": "string" },
+          "status": { "type": "string" },
+          "invoice_id": { "type": "string" }
+        },
+        "required": ["task_id", "status", "invoice_id"]
+      },
+      "BatchComplianceResponse": {
+        "type": "object",
+        "properties": {
+          "task_id": { "type": "string" },
+          "status": { "type": "string" },
+          "invoice_count": { "type": "integer" }
+        },
+        "required": ["task_id", "status", "invoice_count"]
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "service": { "type": "string" }
+        },
+        "required": ["status", "service"]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "detail": { "type": "string" }
+        },
+        "required": ["detail"]
+      }
+    }
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["system"],
+        "summary": "Health check",
+        "operationId": "healthCheck",
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HealthResponse" } } }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Login and receive JWT token",
+        "operationId": "login",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TokenRequest" } } } },
+        "responses": {
+          "200": { "description": "Login successful", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TokenResponse" } } } },
+          "401": { "description": "Invalid credentials", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/auth/register": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Register a new user and tenant",
+        "operationId": "register",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RegisterRequest" } } } },
+        "responses": {
+          "201": { "description": "Registration successful", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserResponse" } } } },
+          "409": { "description": "Email already registered", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "tags": ["auth"],
+        "summary": "Get current user info",
+        "operationId": "getCurrentUser",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Current user info", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserResponse" } } } },
+          "401": { "description": "Not authenticated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/invoices": {
+      "get": {
+        "tags": ["invoices"],
+        "summary": "List invoices with pagination and filters",
+        "operationId": "listInvoices",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "page_size", "in": "query", "schema": { "type": "integer", "default": 50 } },
+          { "name": "status", "in": "query", "schema": { "$ref": "#/components/schemas/InvoiceStatus" } },
+          { "name": "country", "in": "query", "schema": { "type": "string" } },
+          { "name": "search", "in": "query", "schema": { "type": "string" }, "description": "Search by invoice number or vendor name" }
+        ],
+        "responses": {
+          "200": { "description": "Paginated invoice list", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/InvoiceListResponse" } } } }
+        }
+      },
+      "post": {
+        "tags": ["invoices"],
+        "summary": "Create a new invoice (manual entry)",
+        "operationId": "createInvoice",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/InvoiceCreate" } } } },
+        "responses": {
+          "201": { "description": "Invoice created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Invoice" } } } }
+        }
+      }
+    },
+    "/api/v1/invoices/{invoice_id}": {
+      "get": {
+        "tags": ["invoices"],
+        "summary": "Get invoice by ID",
+        "operationId": "getInvoice",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "invoice_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "Invoice details", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Invoice" } } } },
+          "404": { "description": "Invoice not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      },
+      "put": {
+        "tags": ["invoices"],
+        "summary": "Update invoice",
+        "operationId": "updateInvoice",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "invoice_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/InvoiceUpdate" } } } },
+        "responses": {
+          "200": { "description": "Invoice updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Invoice" } } } }
+        }
+      },
+      "delete": {
+        "tags": ["invoices"],
+        "summary": "Delete invoice",
+        "operationId": "deleteInvoice",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "invoice_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "204": { "description": "Invoice deleted" } }
+      }
+    },
+    "/api/v1/invoices/{invoice_id}/approve": {
+      "post": {
+        "tags": ["invoices"],
+        "summary": "Approve invoice for compliance processing",
+        "operationId": "approveInvoice",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "invoice_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "Invoice approved", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Invoice" } } } }
+        }
+      }
+    },
+    "/api/v1/invoices/{invoice_id}/reject": {
+      "post": {
+        "tags": ["invoices"],
+        "summary": "Reject invoice",
+        "operationId": "rejectInvoice",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "invoice_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "Invoice rejected", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Invoice" } } } }
+        }
+      }
+    },
+    "/api/v1/ingestion/upload": {
+      "post": {
+        "tags": ["ingestion"],
+        "summary": "Upload an invoice file for processing",
+        "operationId": "uploadInvoice",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "multipart/form-data": { "schema": { "type": "object", "properties": { "file": { "type": "string", "format": "binary", "description": "Invoice file (PDF, XML, PNG, JPEG, TIFF)" } }, "required": ["file"] } } } },
+        "responses": {
+          "200": { "description": "File uploaded and queued", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FileUploadResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/ingestion/webhook": {
+      "post": {
+        "tags": ["ingestion"],
+        "summary": "Receive invoice via webhook",
+        "operationId": "webhookReceive",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WebhookPayload" } } } },
+        "responses": {
+          "200": { "description": "Webhook received", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FileUploadResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/ingestion/poll/email": {
+      "post": {
+        "tags": ["ingestion"],
+        "summary": "Trigger email inbox poll",
+        "operationId": "triggerEmailPoll",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Poll initiated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PollResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/ingestion/poll/ftp": {
+      "post": {
+        "tags": ["ingestion"],
+        "summary": "Trigger FTP folder poll",
+        "operationId": "triggerFtpPoll",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Poll initiated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PollResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/ingestion/poll/sftp": {
+      "post": {
+        "tags": ["ingestion"],
+        "summary": "Trigger SFTP folder poll",
+        "operationId": "triggerSftpPoll",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Poll initiated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PollResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/ingestion/stats": {
+      "get": {
+        "tags": ["ingestion"],
+        "summary": "Get ingestion statistics",
+        "operationId": "getIngestionStats",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Ingestion statistics", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IngestionStatsResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/ingestion/task/{task_id}": {
+      "get": {
+        "tags": ["ingestion"],
+        "summary": "Check ingestion task status",
+        "operationId": "getIngestionTaskStatus",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "task_id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Task status", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskStatusResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/analytics/dashboard": {
+      "get": {
+        "tags": ["analytics"],
+        "summary": "Get dashboard statistics",
+        "operationId": "getDashboardStats",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Dashboard statistics", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DashboardStats" } } } }
+        }
+      }
+    },
+    "/api/v1/analytics/charts/daily": {
+      "get": {
+        "tags": ["analytics"],
+        "summary": "Get daily invoice volume for charts",
+        "operationId": "getDailyVolume",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "days", "in": "query", "schema": { "type": "integer", "default": 7 } }],
+        "responses": {
+          "200": { "description": "Daily volume data", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ChartData" } } } }
+        }
+      }
+    },
+    "/api/v1/analytics/charts/by-country": {
+      "get": {
+        "tags": ["analytics"],
+        "summary": "Get invoice counts by country",
+        "operationId": "getByCountry",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Country distribution data", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ChartData" } } } }
+        }
+      }
+    },
+    "/api/v1/compliance/status": {
+      "get": {
+        "tags": ["compliance"],
+        "summary": "Get compliance status summary",
+        "operationId": "getComplianceStatus",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Compliance status", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ComplianceStatusResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/compliance/validate/{invoice_id}": {
+      "post": {
+        "tags": ["compliance"],
+        "summary": "Validate invoice against compliance rules (pre-check)",
+        "operationId": "validateCompliance",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "invoice_id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Validation result", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ComplianceValidationResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/compliance/process/{invoice_id}": {
+      "post": {
+        "tags": ["compliance"],
+        "summary": "Trigger compliance processing",
+        "operationId": "processCompliance",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "invoice_id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Compliance queued", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ComplianceTaskResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/compliance/process-batch": {
+      "post": {
+        "tags": ["compliance"],
+        "summary": "Trigger batch compliance processing",
+        "operationId": "processBatchCompliance",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "properties": { "invoice_ids": { "type": "array", "items": { "type": "string" } } }, "required": ["invoice_ids"] } } } },
+        "responses": {
+          "200": { "description": "Batch compliance queued", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BatchComplianceResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/compliance/transmit/{invoice_id}": {
+      "post": {
+        "tags": ["compliance"],
+        "summary": "Transmit compliant invoice to network",
+        "operationId": "transmitInvoice",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "invoice_id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Transmission queued", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ComplianceTaskResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/compliance/archive/{invoice_id}": {
+      "post": {
+        "tags": ["compliance"],
+        "summary": "Archive invoice for post-audit compliance",
+        "operationId": "archiveInvoice",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "invoice_id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Archive queued", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ComplianceTaskResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/compliance/config": {
+      "get": {
+        "tags": ["compliance"],
+        "summary": "List compliance configurations",
+        "operationId": "listComplianceConfigs",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Compliance configs", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ComplianceConfigResponse" } } } } }
+        }
+      },
+      "post": {
+        "tags": ["compliance"],
+        "summary": "Create compliance configuration",
+        "operationId": "createComplianceConfig",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ComplianceConfigCreate" } } } },
+        "responses": {
+          "200": { "description": "Config created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ComplianceConfigResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/compliance/task/{task_id}": {
+      "get": {
+        "tags": ["compliance"],
+        "summary": "Check compliance task status",
+        "operationId": "checkComplianceTask",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "task_id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Task status", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskStatusResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/extraction/extract/{invoice_id}": {
+      "post": {
+        "tags": ["extraction"],
+        "summary": "Trigger AI extraction for an invoice",
+        "operationId": "triggerExtraction",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "invoice_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "Extraction queued", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MessageResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/extraction/extract-batch": {
+      "post": {
+        "tags": ["extraction"],
+        "summary": "Trigger batch extraction",
+        "operationId": "triggerBatchExtraction",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "properties": { "invoice_ids": { "type": "array", "items": { "type": "string", "format": "uuid" } } }, "required": ["invoice_ids"] } } } },
+        "responses": {
+          "200": { "description": "Batch extraction queued", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MessageResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/extraction/status/{invoice_id}": {
+      "get": {
+        "tags": ["extraction"],
+        "summary": "Get extraction status for an invoice",
+        "operationId": "getExtractionStatus",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "invoice_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "Extraction status", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ExtractionStatusResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/settings/": {
+      "get": {
+        "tags": ["settings"],
+        "summary": "Get tenant settings",
+        "operationId": "getSettings",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Tenant settings", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TenantSettings" } } } }
+        }
+      },
+      "put": {
+        "tags": ["settings"],
+        "summary": "Update tenant settings",
+        "operationId": "updateSettings",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } } },
+        "responses": {
+          "200": { "description": "Settings updated", "content": { "application/json": { "schema": { "type": "object", "properties": { "updated": { "type": "boolean" } }, "required": ["updated"] } } } }
+        }
+      }
+    },
+    "/api/v1/settings/countries": {
+      "get": {
+        "tags": ["settings"],
+        "summary": "List available country compliance configurations",
+        "operationId": "listCountryConfigs",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Country configs", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CountryConfigList" } } } }
+        }
+      }
+    },
+    "/api/v1/connectors/available": {
+      "get": {
+        "tags": ["connectors"],
+        "summary": "List available ERP connector types",
+        "operationId": "listAvailableConnectors",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Available connectors", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/AvailableConnector" } } } } }
+        }
+      }
+    },
+    "/api/v1/connectors/": {
+      "get": {
+        "tags": ["connectors"],
+        "summary": "List configured connectors",
+        "operationId": "listConfiguredConnectors",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Configured connectors", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ConnectorResponse" } } } } }
+        }
+      },
+      "post": {
+        "tags": ["connectors"],
+        "summary": "Create ERP connector configuration",
+        "operationId": "createConnector",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConnectorCreate" } } } },
+        "responses": {
+          "201": { "description": "Connector created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConnectorResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/connectors/{connector_id}": {
+      "get": {
+        "tags": ["connectors"],
+        "summary": "Get connector configuration",
+        "operationId": "getConnector",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "connector_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "Connector details", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConnectorResponse" } } } }
+        }
+      },
+      "delete": {
+        "tags": ["connectors"],
+        "summary": "Delete connector configuration",
+        "operationId": "deleteConnector",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "connector_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "204": { "description": "Connector deleted" } }
+      }
+    },
+    "/api/v1/connectors/{connector_id}/test": {
+      "post": {
+        "tags": ["connectors"],
+        "summary": "Test ERP connection",
+        "operationId": "testConnector",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "connector_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "Connection test result", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConnectorTestResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/connectors/{connector_id}/sync": {
+      "post": {
+        "tags": ["connectors"],
+        "summary": "Sync invoices with ERP",
+        "operationId": "syncConnector",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "connector_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConnectorSyncRequest" } } } },
+        "responses": {
+          "200": { "description": "Sync result", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConnectorSyncResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/connectors/{connector_id}/activate": {
+      "post": {
+        "tags": ["connectors"],
+        "summary": "Activate connector",
+        "operationId": "activateConnector",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "connector_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "Connector activated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActivationResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/connectors/{connector_id}/deactivate": {
+      "post": {
+        "tags": ["connectors"],
+        "summary": "Deactivate connector",
+        "operationId": "deactivateConnector",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "connector_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "Connector deactivated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActivationResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/webhooks/events": {
+      "get": {
+        "tags": ["webhooks"],
+        "summary": "List supported webhook event types",
+        "operationId": "listWebhookEvents",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Supported events", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WebhookEventList" } } } }
+        }
+      }
+    },
+    "/api/v1/webhooks/": {
+      "get": {
+        "tags": ["webhooks"],
+        "summary": "List webhook configurations",
+        "operationId": "listWebhooks",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Webhook configs", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/WebhookResponse" } } } } }
+        }
+      },
+      "post": {
+        "tags": ["webhooks"],
+        "summary": "Create webhook configuration",
+        "operationId": "createWebhook",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WebhookCreate" } } } },
+        "responses": {
+          "201": { "description": "Webhook created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WebhookResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/webhooks/{webhook_id}": {
+      "get": {
+        "tags": ["webhooks"],
+        "summary": "Get webhook configuration",
+        "operationId": "getWebhook",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "webhook_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "Webhook details", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WebhookResponse" } } } }
+        }
+      },
+      "put": {
+        "tags": ["webhooks"],
+        "summary": "Update webhook configuration",
+        "operationId": "updateWebhook",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "webhook_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WebhookUpdate" } } } },
+        "responses": {
+          "200": { "description": "Webhook updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WebhookResponse" } } } }
+        }
+      },
+      "delete": {
+        "tags": ["webhooks"],
+        "summary": "Delete webhook",
+        "operationId": "deleteWebhook",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "webhook_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "204": { "description": "Webhook deleted" } }
+      }
+    },
+    "/api/v1/webhooks/{webhook_id}/test": {
+      "post": {
+        "tags": ["webhooks"],
+        "summary": "Send test event to webhook",
+        "operationId": "testWebhook",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "webhook_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "Test result", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WebhookTestResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/webhooks/{webhook_id}/toggle": {
+      "post": {
+        "tags": ["webhooks"],
+        "summary": "Toggle webhook active/inactive",
+        "operationId": "toggleWebhook",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "webhook_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "Toggle result", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ToggleResponse" } } } }
+        }
+      }
+    }
+  },
+  "security": [{ "BearerAuth": [] }]
+}

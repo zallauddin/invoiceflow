@@ -1,0 +1,147 @@
+﻿# InvoiceFlow — Development Docker Compose
+# Usage: docker compose up -d
+# Dashboard: http://localhost:9001 (MinIO), http://localhost:15672 (RabbitMQ)
+
+services:
+  # ASP.NET Core API
+  api:
+    build:
+      context: .
+      dockerfile: src/InvoiceFlow.Api/Dockerfile
+    ports:
+      - "5231:8080"
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=invoiceflow;Username=postgres;Password=postgres
+      - ConnectionStrings__Redis=redis:6379
+      - Jwt__Key=DEV-CHANGE-ME-IN-PRODUCTION-AtLeast32Chars!!
+      - Jwt__Issuer=InvoiceFlow
+      - Jwt__Audience=InvoiceFlow
+      - Jwt__ExpirationMinutes=60
+      - Cors__AllowedOrigins__0=http://localhost:3000
+      - Cors__AllowedOrigins__1=http://localhost:5173
+      - MinIO__Endpoint=minio:9000
+      - MinIO__AccessKey=minioadmin
+      - MinIO__SecretKey=minioadmin
+      - MinIO__UseSsl=false
+      - Serilog__MinimumLevel__Default=Information
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    restart: unless-stopped
+
+  # Background Worker (MassTransit consumers)
+  worker:
+    build:
+      context: .
+      dockerfile: src/InvoiceFlow.Workers/Dockerfile
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=invoiceflow;Username=postgres;Password=postgres
+      - ConnectionStrings__Redis=redis:6379
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Port=5672
+      - RabbitMQ__Username=guest
+      - RabbitMQ__Password=guest
+      - RabbitMQ__VirtualHost=/
+      - MinIO__Endpoint=minio:9000
+      - MinIO__AccessKey=minioadmin
+      - MinIO__SecretKey=minioadmin
+      - MinIO__UseSsl=false
+      - Serilog__MinimumLevel__Default=Information
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    restart: unless-stopped
+
+  # PostgreSQL 16
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: invoiceflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis 7
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # RabbitMQ 3.13
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO (S3-compatible object storage)
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+
+  # Frontend (Next.js dev server)
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:5231
+    volumes:
+      - ./frontend:/app
+    command: sh -c "if [ -f package.json ]; then npm install && npm run dev -- -H 0.0.0.0; else echo 'No frontend project found'; fi"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  minio_data:
+
+

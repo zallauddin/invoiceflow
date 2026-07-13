@@ -1,0 +1,36 @@
+# Prometheus configuration for InvoiceFlow
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # InvoiceFlow Backend API
+  - job_name: "invoiceflow-api"
+    static_configs:
+      - targets: ["backend:8000"]
+    metrics_path: "/metrics"
+    scrape_interval: 10s
+
+  # Celery Workers
+  - job_name: "celery-workers"
+    static_configs:
+      - targets: ["celery-worker-ingestion:8000", "celery-worker-compliance:8000", "celery-worker-webhooks:8000"]
+    metrics_path: "/metrics"
+    scrape_interval: 30s
+
+  # PostgreSQL Exporter (optional — requires postgres_exporter sidecar)
+  # - job_name: "postgresql"
+  #   static_configs:
+  #     - targets: ["postgres-exporter:9187"]
+
+  # Redis Exporter (optional — requires redis_exporter sidecar)
+  # - job_name: "redis"
+  #   static_configs:
+  #     - targets: ["redis-exporter:9121"]
+
+  # MinIO
+  - job_name: "minio"
+    static_configs:
+      - targets: ["minio:9000"]
+    metrics_path: "/minio/v2/metrics/cluster"
+    scrape_interval: 30s

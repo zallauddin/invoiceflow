@@ -1,0 +1,49 @@
+# Build artifacts
+**/bin/
+**/obj/
+**/out/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Docker
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# Swarm
+.swarm/
+
+# Git
+.git/
+.gitignore
+
+# Node
+node_modules/
+.next/
+dist/
+build/
+
+# Test results
+TestResults/
+
+# Documentation
+*.md
+docs/
+
+# Python (legacy)
+backend/
+frontend/.next/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db

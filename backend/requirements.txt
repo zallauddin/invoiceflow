@@ -1,0 +1,55 @@
+# InvoiceFlow Backend Dependencies
+
+# Web framework
+fastapi==0.115.*
+uvicorn[standard]==0.34.*
+python-multipart==0.0.*
+
+# Database
+sqlalchemy[asyncio]==2.0.*
+asyncpg==0.30.*
+alembic==1.14.*
+
+# Redis & Celery
+redis==5.2.*
+celery[redis]==5.4.*
+
+# Auth
+python-jose[cryptography]==3.3.*
+passlib[bcrypt]==1.7.*
+
+# MinIO / S3
+minio==7.2.*
+
+# PDF & XML parsing
+PyMuPDF==1.25.*
+lxml==5.3.*
+
+# OCR
+pytesseract==0.3.*
+Pillow==11.1.*
+
+# LLM clients
+anthropic==0.42.*
+openai==1.61.*
+
+# SFTP
+paramiko==3.5.*
+
+# Validation & schemas
+pydantic[email]==2.10.*
+pydantic-settings==2.7.*
+
+# HTTP client
+httpx==0.28.*
+
+# Utilities
+python-dateutil==2.9.*
+python-dotenv==1.0.*
+
+# ASGI server performance
+uvloop==0.21.*
+httptools==0.6.*
+
+# Prometheus metrics
+prometheus-client==0.21.*

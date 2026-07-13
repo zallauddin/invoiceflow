@@ -1,0 +1,270 @@
+# InvoiceFlow — Production Docker Compose
+# Usage: docker compose -f docker-compose.prod.yml up -d
+
+services:
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env.production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000
+             --workers 4 --loop uvloop --http httptools"
+    networks:
+      - invoiceflow-net
+
+  # Celery Worker (Ingestion + Extraction)
+  celery-worker-ingestion:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env.production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+    command: >
+      celery -A app.tasks.celery_app worker
+      --loglevel=info --concurrency=4
+      --queues=ingestion,extraction
+      --hostname=worker-ingestion@%h
+    networks:
+      - invoiceflow-net
+
+  # Celery Worker (Compliance)
+  celery-worker-compliance:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env.production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+    command: >
+      celery -A app.tasks.celery_app worker
+      --loglevel=info --concurrency=2
+      --queues=compliance,erp
+      --hostname=worker-compliance@%h
+    networks:
+      - invoiceflow-net
+
+  # Celery Worker (Webhooks)
+  celery-worker-webhooks:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env.production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.25"
+    command: >
+      celery -A app.tasks.celery_app worker
+      --loglevel=info --concurrency=4
+      --queues=webhooks
+      --hostname=worker-webhooks@%h
+    networks:
+      - invoiceflow-net
+
+  # Celery Beat (Scheduled Tasks)
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env.production
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    command: >
+      celery -A app.tasks.celery_app beat
+      --loglevel=info
+    networks:
+      - invoiceflow-net
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.production
+    depends_on:
+      - backend
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+    networks:
+      - invoiceflow-net
+
+  # PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-invoiceflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-invoiceflow}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-invoiceflow}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    networks:
+      - invoiceflow-net
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - invoiceflow-net
+
+  # MinIO (S3-compatible object storage)
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    networks:
+      - invoiceflow-net
+
+  # Prometheus (Monitoring)
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.retention.size=2GB'
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    networks:
+      - invoiceflow-net
+
+  # Grafana (Dashboards)
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "127.0.0.1:3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    networks:
+      - invoiceflow-net
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  invoiceflow-net:
+    driver: bridge

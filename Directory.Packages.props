@@ -1,0 +1,106 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- ASP.NET Core -->
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
+    <PackageVersion Include="Quartz.Extensions.Hosting" Version="3.13.1" />
+    <PackageVersion Include="Swashbuckle.AspNetCore" Version="6.9.0" />
+    <PackageVersion Include="Swashbuckle.AspNetCore.Filters" Version="8.0.1" />
+    <!-- Entity Framework Core -->
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.0" />
+    <!-- ASP.NET Core Identity -->
+    <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.0" />
+    <!-- MediatR -->
+    <PackageVersion Include="MediatR" Version="12.4.1" />
+    <PackageVersion Include="MediatR.Extensions.FluentValidation.AspNetCore" Version="3.0.0" />
+    <!-- MassTransit -->
+    <PackageVersion Include="MassTransit" Version="8.3.0" />
+    <PackageVersion Include="MassTransit.RabbitMQ" Version="8.3.0" />
+    <PackageVersion Include="MassTransit.EntityFrameworkCore" Version="8.3.0" />
+    <!-- Redis -->
+    <PackageVersion Include="StackExchange.Redis" Version="2.8.16" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.0" />
+    <!-- MinIO -->
+    <PackageVersion Include="Minio" Version="6.0.4" />
+    <!-- Tesseract OCR -->
+    <PackageVersion Include="Tesseract" Version="5.2.0" />
+    <!-- PDF Processing -->
+    <PackageVersion Include="iTextSharp.LGPLv2.Core" Version="3.4.22" />
+    <PackageVersion Include="QuestPDF" Version="2024.10.0" />
+    <PackageVersion Include="PdfPig" Version="0.1.9" />
+    <!-- XML Processing -->
+    <PackageVersion Include="System.Xml.XPath.XmlDocument" Version="4.3.0" />
+    <!-- Cryptography / Signing -->
+    <PackageVersion Include="BouncyCastle.Cryptography" Version="2.5.0" />
+    <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.9" />
+    <!-- Validation -->
+    <PackageVersion Include="FluentValidation" Version="11.10.0" />
+    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="11.10.0" />
+    <!-- Mapping -->
+    <PackageVersion Include="Mapster" Version="7.4.0" />
+    <!-- HTTP Client -->
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.0" />
+    <PackageVersion Include="Polly" Version="8.5.0" />
+    <PackageVersion Include="Microsoft.Extensions.Http.Polly" Version="10.0.0" />
+    <!-- CSV / EDI -->
+    <PackageVersion Include="CsvHelper" Version="33.0.1" />
+    <!-- SignalR -->
+    <PackageVersion Include="Microsoft.AspNetCore.SignalR" Version="1.2.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="10.0.0" />
+    <!-- SFTP -->
+    <PackageVersion Include="SSH.NET" Version="2024.1.0" />
+    <PackageVersion Include="FluentFTP" Version="49.0.2" />
+    <!-- IMAP / MIME -->
+    <PackageVersion Include="MailKit" Version="4.17.0" />
+    <PackageVersion Include="MimeKit" Version="4.17.0" />
+    <!-- OpenAPI / Swagger -->
+    <PackageVersion Include="NSwag.AspNetCore" Version="14.2.0" />
+    <!-- Health Checks -->
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.0" />
+    <!-- Scheduling -->
+    <PackageVersion Include="Quartz" Version="3.13.1" />
+    <PackageVersion Include="Quartz.Extensions.DependencyInjection" Version="3.13.1" />
+    <!-- Monitoring -->
+    <PackageVersion Include="prometheus-net.AspNetCore" Version="8.2.1" />
+    <PackageVersion Include="Serilog.AspNetCore" Version="8.0.3" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageVersion Include="Serilog.Sinks.Seq" Version="8.0.0" />
+    <!-- Testing -->
+    <PackageVersion Include="xunit" Version="2.9.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageVersion Include="xunit.runner.console" Version="2.9.2" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageVersion Include="FluentAssertions" Version="6.12.1" />
+    <PackageVersion Include="NSubstitute" Version="5.3.0" />
+    <PackageVersion Include="Testcontainers" Version="4.0.0" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.0.0" />
+    <PackageVersion Include="Testcontainers.RabbitMq" Version="4.0.0" />
+    <PackageVersion Include="Testcontainers.Redis" Version="4.0.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.0" />
+    <PackageVersion Include="Bogus" Version="35.6.1" />
+    <PackageVersion Include="coverlet.collector" Version="6.0.2" />
+    <!-- Logging -->
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+    <!-- Hosting -->
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
+    <!-- DependencyInjection -->
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.0" />
+    <!-- Authentication -->
+    <PackageVersion Include="BCrypt.Net-Next" Version="4.0.3" />
+    <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.3.0" />
+    <!-- Date/Time -->
+    <PackageVersion Include="NodaTime" Version="3.1.11" />
+  </ItemGroup>
+</Project>

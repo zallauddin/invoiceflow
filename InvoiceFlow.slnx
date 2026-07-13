@@ -1,0 +1,20 @@
+<Solution>
+  <Folder Name="/packages/">
+    <Project Path="packages/InvoiceFlow.Compliance.Abstractions/InvoiceFlow.Compliance.Abstractions.csproj" />
+    <Project Path="packages/InvoiceFlow.Cryptography/InvoiceFlow.Cryptography.csproj" />
+    <Project Path="packages/InvoiceFlow.DocumentParser/InvoiceFlow.DocumentParser.csproj" />
+    <Project Path="packages/InvoiceFlow.EventBus/InvoiceFlow.EventBus.csproj" />
+    <Project Path="packages/InvoiceFlow.Formats.Abstractions/InvoiceFlow.Formats.Abstractions.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/InvoiceFlow.Api/InvoiceFlow.Api.csproj" />
+    <Project Path="src/InvoiceFlow.Application/InvoiceFlow.Application.csproj" />
+    <Project Path="src/InvoiceFlow.Core/InvoiceFlow.Core.csproj" />
+    <Project Path="src/InvoiceFlow.Infrastructure/InvoiceFlow.Infrastructure.csproj" />
+    <Project Path="src/InvoiceFlow.Workers/InvoiceFlow.Workers.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/InvoiceFlow.IntegrationTests/InvoiceFlow.IntegrationTests.csproj" />
+    <Project Path="tests/InvoiceFlow.UnitTests/InvoiceFlow.UnitTests.csproj" />
+  </Folder>
+</Solution>
