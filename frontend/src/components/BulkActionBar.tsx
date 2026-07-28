@@ -13,6 +13,9 @@ interface BulkActionBarProps {
   loading: string | null;
   onApprove: () => void;
   onReject: () => void;
+  onValidate?: () => void;
+  onComply?: () => void;
+  onTransmit?: () => void;
   onClear: () => void;
 }
 
@@ -21,6 +24,9 @@ export function BulkActionBar({
   loading,
   onApprove,
   onReject,
+  onValidate,
+  onComply,
+  onTransmit,
   onClear,
 }: BulkActionBarProps) {
   if (selectedCount === 0) return null;
@@ -35,7 +41,7 @@ export function BulkActionBar({
           Clear selection
         </button>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <Button
           variant="success"
           size="sm"
@@ -43,7 +49,7 @@ export function BulkActionBar({
           onClick={onApprove}
         >
           {loading === "approve" ? <Spinner size="sm" /> : null}
-          ✅ Approve All
+          ✅ Approve
         </Button>
         <Button
           variant="danger"
@@ -52,8 +58,41 @@ export function BulkActionBar({
           onClick={onReject}
         >
           {loading === "reject" ? <Spinner size="sm" /> : null}
-          ❌ Reject All
+          ❌ Reject
         </Button>
+        {onValidate && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={loading !== null}
+            onClick={onValidate}
+          >
+            {loading === "validate" ? <Spinner size="sm" /> : null}
+            🔬 Validate
+          </Button>
+        )}
+        {onComply && (
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={loading !== null}
+            onClick={onComply}
+          >
+            {loading === "comply" ? <Spinner size="sm" /> : null}
+            🛡️ Process Compliance
+          </Button>
+        )}
+        {onTransmit && (
+          <Button
+            variant="success"
+            size="sm"
+            disabled={loading !== null}
+            onClick={onTransmit}
+          >
+            {loading === "transmit" ? <Spinner size="sm" /> : null}
+            🚀 Transmit
+          </Button>
+        )}
       </div>
     </div>
   );

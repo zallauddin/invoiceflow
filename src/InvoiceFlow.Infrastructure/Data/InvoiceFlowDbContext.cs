@@ -59,12 +59,17 @@ public class InvoiceFlowDbContext : DbContext
 
     // --- Workflow Entities ---
     public DbSet<ApprovalRequest> ApprovalRequests => Set<ApprovalRequest>();
+    public DbSet<ApprovalChain> ApprovalChains => Set<ApprovalChain>();
+    public DbSet<ApprovalStep> ApprovalSteps => Set<ApprovalStep>();
 
     // --- Audit ---
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     // --- Auth ---
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
+    // --- API Keys ---
+    public DbSet<InvoiceFlow.Core.Entities.ApiKey> ApiKeys => Set<InvoiceFlow.Core.Entities.ApiKey>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -175,6 +180,16 @@ public class InvoiceFlowDbContext : DbContext
             e => _filterTenantId == null
               || e.SourceDocument.TenantId == _filterTenantId
               || e.TargetDocument.TenantId == _filterTenantId);
+
+        // Workflow entities
+        modelBuilder.Entity<ApprovalChain>().HasQueryFilter(
+            e => _filterTenantId == null || e.TenantId == _filterTenantId);
+        modelBuilder.Entity<ApprovalStep>().HasQueryFilter(
+            e => _filterTenantId == null || e.TenantId == _filterTenantId);
+
+        // API Keys
+        modelBuilder.Entity<InvoiceFlow.Core.Entities.ApiKey>().HasQueryFilter(
+            e => _filterTenantId == null || e.TenantId == _filterTenantId);
 
         // Tenant is NOT tenant-filtered (root entity, no FK to itself)
         // InvoiceLine is filtered transitively via Invoice navigation

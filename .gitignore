@@ -123,14 +123,17 @@ postgres_data/
 redis_data/
 minio_data/
 
-# ---------------- Agent tooling (regenerated locally) ----------------
-# Project-level conventions are committed (CLAUDE.md, .opencode/.specify/, .claude/).
-# These are regeneratable caches and indexes — safe to ignore.
+# ---------------- Agent / coding tooling (local-only, not on remote) ----------------
+# These are coding-agent configuration files that should remain local to each
+# developer environment and NOT be committed to the repository.
+.claude/
+.opencode/
+.specify/
+AGENTS.md
+
+# Regeneratable caches and indexes — safe to ignore.
 .swarm/
 .gitnexus/
-.opencode/memory/
-.opencode/node_modules/
-.opencode/elf/
 .infinit-graph.json
 knowledge.md
 plan/

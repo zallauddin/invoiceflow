@@ -16,20 +16,23 @@ var app = builder.Build();
 
 // --- Middleware pipeline (order matters!) ---
 
-// 1. Global exception handling
+// 1. API versioning middleware (before auth/endpoints)
+app.UseMiddleware<InvoiceFlow.Api.Middleware.ApiVersioningMiddleware>();
+
+// 2. Global exception handling
 app.UseExceptionHandler("/error");
 
-// 2. HTTPS redirection (production)
+// 3. HTTPS redirection (production)
 if (!app.Environment.IsDevelopment())
 {
     app.UseHsts();
 }
 app.UseHttpsRedirection();
 
-// 3. CORS (must be before auth/endpoints)
+// 4. CORS (must be before auth/endpoints)
 app.UseCors("InvoiceFlow");
 
-// 4. Authentication & Authorization
+// 5. Authentication & Authorization
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -54,7 +57,10 @@ app.MapHealthChecks("/health/ready", new()
 // 8. Prometheus metrics endpoint
 app.MapMetrics("/metrics");
 
-// 9. Minimal API endpoints (module registration point)
+// 9. SignalR hub for real-time updates
+app.MapHub<InvoiceFlow.Api.Hubs.InvoiceHub>("/hubs/invoices");
+
+// 10. Minimal API endpoints (module registration point)
 app.MapEndpoints();
 
 app.Run();

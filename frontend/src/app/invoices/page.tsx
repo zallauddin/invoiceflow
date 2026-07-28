@@ -4,7 +4,8 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { invoicesApi, ingestionApi, InvoiceListParams } from "@/lib/api";
+import { invoicesApi, ingestionApi, complianceApi, InvoiceListParams } from "@/lib/api";
+import { useSignalR } from "@/lib/signalr";
 import type { Invoice, InvoiceStatus } from "@/lib/types";
 import { Card, CardContent, Button, Input, Select, Badge, Spinner, EmptyState } from "@/components/ui";
 import { StatusBadge, CountryBadge, ComplianceModelBadge } from "@/components/StatusBadge";
@@ -162,6 +163,9 @@ export default function InvoicesPage() {
         switch (action) {
           case "approve": await invoicesApi.approve(id); break;
           case "reject": await invoicesApi.reject(id); break;
+          case "validate": await complianceApi.validate(id); break;
+          case "comply": await complianceApi.process(id); break;
+          case "transmit": await complianceApi.transmit(id); break;
         }
       }
       toast(`${action} completed for ${ids.length} invoice(s)`, "success");
@@ -215,6 +219,9 @@ export default function InvoicesPage() {
         loading={bulkLoading}
         onApprove={() => handleBulkAction("approve")}
         onReject={() => handleBulkAction("reject")}
+        onValidate={() => handleBulkAction("validate")}
+        onComply={() => handleBulkAction("comply")}
+        onTransmit={() => handleBulkAction("transmit")}
         onClear={() => setSelectedIds(new Set())}
       />
 

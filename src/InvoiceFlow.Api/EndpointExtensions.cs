@@ -19,6 +19,8 @@ public static class EndpointExtensions
         app.MapDeliveryNoteEndpoints();
         app.MapReminderEndpoints();
         app.MapDocumentsEndpoints();
+        app.MapExportEndpoints(); // CSV/Excel export
+        app.MapApprovalEndpoints(); // Multi-step approval workflow
 
         // Base info endpoint
         app.MapGet("/", () => Results.Ok(new

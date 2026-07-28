@@ -7,6 +7,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { analyticsApi, invoicesApi, complianceApi } from "@/lib/api";
+import { useSignalR } from "@/lib/signalr";
+import { useI18n } from "@/lib/i18n";
 import { Card, CardHeader, CardContent, Badge, Spinner, EmptyState } from "@/components/ui";
 import { StatusBadge, CountryBadge } from "@/components/StatusBadge";
 import { StatCardSkeleton, TableSkeleton, ChartSkeleton, Skeleton } from "@/components/ui/Skeleton";
@@ -16,6 +18,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import type { InvoiceStatus } from "@/lib/types";
+import type { DashboardUpdateEvent, ComplianceUpdateEvent } from "@/lib/signalr";
 
 const CHART_COLORS = ["#2563EB", "#16A34A", "#F59E0B", "#EF4444", "#8B5CF6", "#06B6D4"];
 
@@ -87,12 +90,25 @@ export default function DashboardPage() {
     }
   }, []);
 
-  // Poll every 30s for fresh data
+  // Initial load
+  useEffect(() => { load(); }, [load]);
+
+  // Poll every 30s for fresh data (fallback until @microsoft/signalr is installed)
+  // When SignalR is active, useSignalR will push real-time updates, making polling redundant
   useEffect(() => {
-    load();
     const interval = setInterval(load, 30000);
     return () => clearInterval(interval);
   }, [load]);
+
+  // Real-time updates via SignalR (will replace 30s polling once @microsoft/signalr is installed)
+  const { connected: _connected } = useSignalR({
+    onDashboardUpdated: (data: DashboardUpdateEvent) => {
+      setStats((prev) => prev ? { ...prev, invoices_today: data.invoicesToday, success_rate: data.successRate, pending: data.pendingCount, total_processed: data.totalProcessed } : prev);
+    },
+    onComplianceUpdated: (data: ComplianceUpdateEvent) => {
+      setComplianceStatus(data);
+    },
+  });
 
   const handleTriageClick = (item: TriageItem) => {
     router.push(item.href);

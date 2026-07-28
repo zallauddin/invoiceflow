@@ -1,14 +1,17 @@
 using System.Text;
+using InvoiceFlow.Api.Authorization;
 using InvoiceFlow.Api.Infrastructure;
 using InvoiceFlow.Application.Mapping;
 using InvoiceFlow.Core.Interfaces;
 using InvoiceFlow.Infrastructure.Auth;
 using InvoiceFlow.Infrastructure.Caching;
+using InvoiceFlow.Infrastructure.Compliance;
 using InvoiceFlow.Infrastructure.Data;
 using InvoiceFlow.Infrastructure.Repositories;
 using InvoiceFlow.Infrastructure.Services;
 using InvoiceFlow.Infrastructure.Storage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+// AddStackExchangeRedis extension is in Microsoft.AspNetCore.SignalR namespace (from the NuGet package)
 using Minio;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -99,7 +102,33 @@ public static class DependencyInjection
             };
         });
 
-        services.AddAuthorization();
+        // --- Authorization: Role-Based Access Control (RBAC) ---
+        services.AddAuthorization(options =>
+        {
+            // Admin-only policy — full system access
+            options.AddPolicy("RequireAdmin", policy =>
+                policy.RequireRole("Admin"));
+
+            // Approver policy — can approve/reject invoices
+            options.AddPolicy("RequireApprover", policy =>
+                policy.RequireRole("Admin", "User"));
+
+            // Viewer policy — read-only access (default for all authenticated users)
+            options.AddPolicy("RequireViewer", policy =>
+                policy.RequireAuthenticatedUser());
+
+            // Compliance policy — can run compliance processing
+            options.AddPolicy("RequireComplianceAccess", policy =>
+                policy.RequireRole("Admin", "User"));
+
+            // Connector management policy
+            options.AddPolicy("RequireConnectorManagement", policy =>
+                policy.RequireRole("Admin"));
+
+            // Tenant admin policy — can manage users and tenant settings
+            options.AddPolicy("RequireTenantAdmin", policy =>
+                policy.RequireRole("Admin"));
+        });
 
         // --- CORS ---
         services.AddCors(options =>
@@ -161,6 +190,31 @@ public static class DependencyInjection
         services.AddSerilog(options =>
             options.ReadFrom.Configuration(configuration));
 
+        // --- Compliance Orchestrator ---
+        services.AddScoped<IComplianceOrchestrator, ComplianceOrchestrator>();
+
+        // --- Approval Workflow Engine ---
+        services.AddScoped<IWorkflowService, InvoiceFlow.Infrastructure.Services.WorkflowService>();
+
+        // --- Webhook Delivery with Exponential Backoff ---
+        services.AddScoped<IWebhookDeliveryService, InvoiceFlow.Infrastructure.Services.WebhookDeliveryService>();
+
+        // --- PDF Invoice Generation ---
+        services.AddScoped<IInvoicePdfGenerationService, InvoiceFlow.Infrastructure.Services.InvoicePdfGenerationService>();
+
+        // --- Email Notification Service ---
+        services.Configure<InvoiceFlow.Infrastructure.Services.EmailNotificationOptions>(
+            configuration.GetSection("EmailNotifications"));
+        services.AddScoped<IEmailNotificationService, InvoiceFlow.Infrastructure.Services.EmailNotificationService>();
+
+        // --- HttpClientFactory (for WebhookDeliveryService) ---
+        services.AddHttpClient("WebhookDelivery");
+
+        // --- API Key Authentication ---
+        services.AddAuthentication()
+            .AddScheme<ApiKeyAuthenticationOptions, ApiKeyAuthenticationHandler>(
+                "ApiKey", options => { });
+
         // --- Document services ---
         services.AddScoped<IDocumentThumbnailService, DocumentThumbnailService>();
         services.AddScoped<IDocumentSearchService, DocumentSearchService>();
@@ -171,6 +225,17 @@ public static class DependencyInjection
         new DocumentMappingRegister().Register(mapsterConfig);
         services.AddSingleton(mapsterConfig);
         services.AddScoped<IMapper, Mapper>();
+
+        // --- SignalR (real-time dashboard updates) ---
+        // NOTE: For multi-server scale-out, add package reference to
+        // Microsoft.AspNetCore.SignalR.StackExchangeRedis and uncomment:
+        //   .AddStackExchangeRedis(configuration.GetConnectionString("Redis") ?? "localhost:6379")
+        services.AddSignalR()
+            .AddJsonProtocol(options =>
+            {
+                options.PayloadSerializerOptions.PropertyNamingPolicy =
+                    System.Text.Json.JsonNamingPolicy.CamelCase;
+            });
 
         // --- MediatR (CQRS mediator pipeline) ---
         services.AddMediatR(cfg =>
