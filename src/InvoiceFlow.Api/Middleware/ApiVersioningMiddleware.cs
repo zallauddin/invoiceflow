@@ -58,9 +58,9 @@ public class ApiVersioningMiddleware
 
         var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
         // segments[0] == "api"
-        if (segments.Length >= 3 && segments[1].Equals("api", StringComparison.OrdinalIgnoreCase))
+        if (segments.Length >= 3 && segments[0].Equals("api", StringComparison.OrdinalIgnoreCase))
         {
-            var potentialVersion = segments[2].ToLowerInvariant();
+            var potentialVersion = segments[1].ToLowerInvariant();
             if (potentialVersion.StartsWith('v') && potentialVersion.Length > 1 &&
                 int.TryParse(potentialVersion[1..], out _))
             {
@@ -68,8 +68,9 @@ public class ApiVersioningMiddleware
                 hasVersionInPath = true;
 
                 // Rewrite the path: remove the version segment
-                var remainingPath = string.Join("/", segments.Skip(1).Take(1)) + "/" +
-                                    string.Join("/", segments.Skip(3));
+                // /api/v1/invoices → /api/invoices
+                var remainingPath = segments[0] + "/" +
+                                    string.Join("/", segments.Skip(2));
                 context.Request.Path = "/" + remainingPath;
 
                 _logger.LogDebug(
